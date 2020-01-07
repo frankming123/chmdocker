@@ -26,7 +26,7 @@ func main() {
 	app.Before = func(context *cli.Context) error {
 		// Log as JSON instead of the default ASCII formatter.
 		log.SetFormatter(&log.JSONFormatter{})
-
+		log.SetLevel(log.DebugLevel)
 		log.SetOutput(os.Stdout)
 		return nil
 	}

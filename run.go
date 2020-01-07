@@ -17,11 +17,12 @@ func Run(tty bool, cmd string, res *subsystems.ResourceConfig) {
 
 	//创建cgroup
 	cgroupManager := cgroups.NewCgroupManager("chmdocker-cgroup")
-	defer cgroupManager.Destroy()
 	cgroupManager.Set(res)
 	cgroupManager.Apply(parent.Process.Pid)
 
 	parent.Wait()
 
+	log.Debug("container task ended.")
+	cgroupManager.Destroy()
 	os.Exit(-1)
 }

@@ -2,6 +2,7 @@ package subsystems
 
 import (
 	"fmt"
+	log "github.com/Sirupsen/logrus"
 	"io/ioutil"
 	"os"
 	"path"
@@ -26,6 +27,8 @@ func (s *CpusetSubSystem) Set(cgroupPath string, res *ResourceConfig) error {
 
 func (s *CpusetSubSystem) Remove(cgroupPath string) error {
 	if subsysCgroupPath, err := GetCgroupPath(s.Name(), cgroupPath, false); err == nil {
+		log.Debugf("removing cgroup: %v", subsysCgroupPath)
+
 		return os.RemoveAll(subsysCgroupPath)
 	} else {
 		return err

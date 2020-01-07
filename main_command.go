@@ -18,29 +18,29 @@ var runCommand = cli.Command{
 			Usage: "enable tty",
 		},
 		cli.StringFlag{
-			Name:  "m",
-			Usage: "memory limit",
+			Name:  "memory, m",
+			Usage: "Memory limit (format: <number>[<unit>], where unit = b, k, m or g)",
 		},
 		cli.StringFlag{
-			Name:  "cpushare",
-			Usage: "cpushare limit",
+			Name:  "cpu-shares",
+			Usage: "CPU shares",
 		},
 		cli.StringFlag{
-			Name:  "cpuset",
-			Usage: "cpuset limit",
+			Name:  "cpuset-cpus",
+			Usage: "CPUs in which to allow execution (0-3, 0,1)",
 		},
 	},
 	// 输入参数后执行的操作
-	Action: func(context *cli.Context) error {
-		if len(context.Args()) < 1 {
+	Action: func(c *cli.Context) error {
+		if len(c.Args()) < 1 {
 			return fmt.Errorf("Missing container command")
 		}
-		cmd := context.Args().Get(0)
-		tty := context.Bool("it")
+		cmd := c.Args().Get(0)
+		tty := c.Bool("it")
 		resConf := &subsystems.ResourceConfig{
-			MemoryLimit: context.String("m"),
-			CpuSet:      context.String("cpuset"),
-			CpuShare:    context.String("cpushare"),
+			MemoryLimit: c.String("memory"),
+			CpuSet:      c.String("cpuset-cpus"),
+			CpuShare:    c.String("cpu-shares"),
 		}
 		// 运行Run函数
 		Run(tty, cmd, resConf)
@@ -51,10 +51,9 @@ var runCommand = cli.Command{
 var initCommand = cli.Command{
 	Name:  "init",
 	Usage: "Init container process run user's process in container. Do not call it outside",
-	Action: func(context *cli.Context) error {
-		log.Infof("init come on")
-		cmd := context.Args().Get(0)
-		log.Infof("command %s", cmd)
+	Action: func(c *cli.Context) error {
+		log.Debugf("init come on")
+		cmd := c.Args().Get(0)
 		err := container.RunContainerInitProcess(cmd, nil)
 		return err
 	},

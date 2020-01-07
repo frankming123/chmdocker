@@ -6,6 +6,7 @@ import (
 	"syscall"
 )
 
+// NewParentProcess 创建子进程，并隔离命名空间
 func NewParentProcess(tty bool, command string) *exec.Cmd {
     args := []string{"init", command}
     // /proc/self/是一个链接，指向进程自身，/proc/PID/
