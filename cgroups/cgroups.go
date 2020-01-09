@@ -1,55 +1,110 @@
 package cgroups
 
-import (
-	"bufio"
-	"os"
-	"strings"
-)
+// Cgroup 包括路径，资源等信息
+type Cgroup struct {
+	// Deprecated, use Path instead
+	Parent string
 
-type Subsystem int
+	// Path specifies the path to cgroups that are created and/or joined by the container.
+	// The path is assumed to be relative to the host system cgroup mountpoint.
+	Path string
 
-const (
-	// BLKIO subsystem: 为块设备设定输入/输出限制,比如物理驱动设备(包括磁盘,固态硬盘,USB等)
-	BLKIO Subsystem = iota
-	// CPU subsystem: 使用调度程序控制task对CPU的使用
-	CPU
-	// CPUACCT subsystem: 自动生成cgroup中task对CPU资源使用情况的报告
-	CPUACCT
-	// CPUSET subsystem: 为cgroup中的task分配独立的CPU(此处针对多处理器系统)和内存
-	CPUSET
-	// DEVICES subsystem: 开启或关闭cgroup中task对设备的访问
-	DEVICES
-	// FREEZER subsystem: 挂起或恢复cgroup中的task
-	FREEZER
-	// MEMORY subsystem: 设定cgroup中task对内存使用量的限定,并且自动生成这些task对内存资源使用情况的报告
-	MEMORY
-	// PERFEVENT subsystem: 使得cgroup中的task可以进行统一的性能测试
-	PERFEVENT
-	// NETCLS subsystem: 通过使用等级识别符(classid)标记网络数据包,从而允许Linux流量控制程序(TC：Traffic Controller)识别从具体cgroup中生成的数据包
-	NETCLS
-)
+	// ScopePrefix describes prefix for the scope name
+	ScopePrefix string
 
-// FindCgroupMountpoint 查找cgroup指定子系统的挂载路径
-func FindCgroupMountpoint(subsystem string) string {
-	f, err := os.Open("/proc/self/mountinfo")
-	if err != nil {
-		return ""
-	}
-	defer f.Close()
+	// Paths represent the absolute cgroups paths to join.
+	// This takes precedence over Path.
+	Paths map[string]string
 
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		txt := scanner.Text()
-		fields := strings.Split(txt, " ")
-		for _, opt := range strings.Split(fields[len(fields)-1], ",") {
-			if opt == subsystem {
-				return fields[4]
-			}
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return ""
-	}
+	// Resources contains various cgroups settings to apply
+	*Resources
+}
 
-	return ""
+// Resources 包括cgroup资源
+type Resources struct {
+	// Memory limit (in bytes)
+	Memory int64 `json:"memory"`
+
+	// Memory reservation or soft_limit (in bytes)
+	MemoryReservation int64 `json:"memory_reservation"`
+
+	// Total memory usage (memory + swap); set `-1` to enable unlimited swap
+	MemorySwap int64 `json:"memory_swap"`
+
+	// Kernel memory limit (in bytes)
+	KernelMemory int64 `json:"kernel_memory"`
+
+	// Kernel memory limit for TCP use (in bytes)
+	KernelMemoryTCP int64 `json:"kernel_memory_tcp"`
+
+	// CPU shares (relative weight vs. other containers)
+	CpuShares uint64 `json:"cpu_shares"`
+
+	// CPU hardcap limit (in usecs). Allowed cpu time in a given period.
+	CpuQuota int64 `json:"cpu_quota"`
+
+	// CPU period to be used for hardcapping (in usecs). 0 to use system default.
+	CpuPeriod uint64 `json:"cpu_period"`
+
+	// How many time CPU will use in realtime scheduling (in usecs).
+	CpuRtRuntime int64 `json:"cpu_rt_quota"`
+
+	// CPU period to be used for realtime scheduling (in usecs).
+	CpuRtPeriod uint64 `json:"cpu_rt_period"`
+
+	// CPU to use
+	CpusetCpus string `json:"cpuset_cpus"`
+
+	// MEM to use
+	CpusetMems string `json:"cpuset_mems"`
+
+	// Process limit; set <= `0' to disable limit.
+	PidsLimit int64 `json:"pids_limit"`
+
+	// Specifies per cgroup weight, range is from 10 to 1000.
+	BlkioWeight uint16 `json:"blkio_weight"`
+
+	// Specifies tasks' weight in the given cgroup while competing with the cgroup's child cgroups, range is from 10 to 1000, cfq scheduler only
+	BlkioLeafWeight uint16 `json:"blkio_leaf_weight"`
+
+	// Weight per cgroup per device, can override BlkioWeight.
+	BlkioWeightDevice []*WeightDevice `json:"blkio_weight_device"`
+
+	// IO read rate limit per cgroup per device, bytes per second.
+	BlkioThrottleReadBpsDevice []*ThrottleDevice `json:"blkio_throttle_read_bps_device"`
+
+	// IO write rate limit per cgroup per device, bytes per second.
+	BlkioThrottleWriteBpsDevice []*ThrottleDevice `json:"blkio_throttle_write_bps_device"`
+
+	// IO read rate limit per cgroup per device, IO per second.
+	BlkioThrottleReadIOPSDevice []*ThrottleDevice `json:"blkio_throttle_read_iops_device"`
+
+	// IO write rate limit per cgroup per device, IO per second.
+	BlkioThrottleWriteIOPSDevice []*ThrottleDevice `json:"blkio_throttle_write_iops_device"`
+
+	// set the freeze value for the process
+	Freezer FreezerState `json:"freezer"`
+
+	// Hugetlb limit (in bytes)
+	HugetlbLimit []*HugepageLimit `json:"hugetlb_limit"`
+
+	// Whether to disable OOM Killer
+	OomKillDisable bool `json:"oom_kill_disable"`
+
+	// Tuning swappiness behaviour per cgroup
+	MemorySwappiness *uint64 `json:"memory_swappiness"`
+
+	// Set priority of network traffic for container
+	NetPrioIfpriomap []*IfPrioMap `json:"net_prio_ifpriomap"`
+
+	// Set class identifier for container's network packets
+	NetClsClassid uint32 `json:"net_cls_classid_u"`
+
+	// Used on cgroups v2:
+
+	// CpuWeight sets a proportional bandwidth limit.
+	CpuWeight uint64 `json:"cpu_weight"`
+
+	// CpuMax sets she maximum bandwidth limit (format: max period).
+	CpuMax string `json:"cpu_max"`
 }
