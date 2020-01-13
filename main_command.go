@@ -1,7 +1,7 @@
 package main
 
 import (
-	"chmdocker/cgroups/subsystems"
+	"chmdocker/cgroups"
 	"chmdocker/container"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
@@ -37,13 +37,13 @@ var runCommand = cli.Command{
 		}
 		cmd := c.Args().Get(0)
 		tty := c.Bool("it")
-		resConf := &subsystems.ResourceConfig{
-			MemoryLimit: c.String("memory"),
-			CpuSet:      c.String("cpuset-cpus"),
-			CpuShare:    c.String("cpu-shares"),
+		resource := &cgroups.Resources{
+			Memory:     c.String("memory"),
+			CpusetCpus: c.String("cpuset-cpus"),
+			CpuShares:   c.String("cpu-shares"),
 		}
 		// 运行Run函数
-		Run(tty, cmd, resConf)
+		Run(tty, cmd, resource)
 		return nil
 	},
 }

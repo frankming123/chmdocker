@@ -2,13 +2,12 @@ package main
 
 import (
 	"chmdocker/cgroups"
-	"chmdocker/cgroups/subsystems"
 	"chmdocker/container"
 	log "github.com/Sirupsen/logrus"
 	"os"
 )
 
-func Run(tty bool, cmd string, res *subsystems.ResourceConfig) {
+func Run(tty bool, cmd string, res *cgroups.Resources) {
 	// 配置新进程环境
 	parent := container.NewParentProcess(tty, cmd)
 	if err := parent.Start(); err != nil {
@@ -16,13 +15,14 @@ func Run(tty bool, cmd string, res *subsystems.ResourceConfig) {
 	}
 
 	//创建cgroup
-	cgroupManager := cgroups.NewCgroupManager("chmdocker-cgroup")
-	cgroupManager.Set(res)
-	cgroupManager.Apply(parent.Process.Pid)
+	cgroup := cgroups.NewCgroup("chmdocker")
+	cgroup.Resources = res
+	cgroup.GetAllMountpoint()
+	cgroup.Set(parent.Process.Pid)
 
 	parent.Wait()
 
 	log.Debug("container task ended.")
-	cgroupManager.Destroy()
+	cgroup.Remove()
 	os.Exit(-1)
 }
