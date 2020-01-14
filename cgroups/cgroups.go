@@ -39,6 +39,14 @@ func NewCgroup(scopePrefix string) *Cgroup {
 
 // Set 设置cgroup资源
 func (c *Cgroup) Set() {
+	// cpuset.cpus和cpuset.mems需同时配置才能生效，如果有一项缺少，配置相同即可
+	if c.CpusetCpus == "" && c.CpusetMems != "" {
+		c.CpusetCpus = c.CpusetMems
+	}
+	if c.CpusetCpus != "" && c.CpusetMems == "" {
+		c.CpusetMems = c.CpusetCpus
+	}
+
 	t := reflect.TypeOf(c.Resources).Elem()
 	v := reflect.ValueOf(c.Resources).Elem()
 	for i := 0; i < t.NumField(); i++ {
