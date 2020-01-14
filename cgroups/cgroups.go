@@ -1,19 +1,20 @@
 package cgroups
 
 import (
-	"bufio"
 	log "github.com/Sirupsen/logrus"
 	"io/ioutil"
 	"os"
 	"path"
 	"reflect"
 	"strconv"
-	"strings"
 )
 
 // Cgroup 包括路径，资源等信息
 type Cgroup struct {
-	// Paths 存放各个subsystem的绝对路径
+	// Mounts 存放所有挂载点
+	Mounts map[string]string
+
+	// Paths 存放所有cgroup路径
 	Paths map[string]string
 
 	// ScopePrefix 表示容器域
@@ -26,39 +27,18 @@ type Cgroup struct {
 // NewCgroup 初始化Cgroup结构体
 func NewCgroup(scopePrefix string) *Cgroup {
 	c := &Cgroup{
+		Mounts:      make(map[string]string),
 		Paths:       make(map[string]string),
 		ScopePrefix: scopePrefix,
 		Resources:   &Resources{},
 	}
+	// c.GetAllMountpoint()
+	c.Mounts = GetAllMountpoint()
 	return c
 }
 
-// GetAllMountpoint 查找cgroup指定子系统的挂载路径，并写入到Paths中
-func (c *Cgroup) GetAllMountpoint() {
-	f, err := os.Open("/proc/self/mountinfo")
-	if err != nil {
-		log.Errorf("Get all mountpoint error: %v", err)
-		return
-	}
-	defer f.Close()
-
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		txt := scanner.Text()
-		fields := strings.Split(txt, " ")
-		for _, opt := range strings.Split(fields[len(fields)-1], ",") {
-			if _, ok := c.Paths[opt]; !ok {
-				c.Paths[opt] = fields[4]
-			}
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		log.Warnf("Get all mountpoint error: mount point scanner error: %v", err)
-	}
-}
-
 // Set 设置cgroup资源
-func (c *Cgroup) Set(pid int) {
+func (c *Cgroup) Set() {
 	t := reflect.TypeOf(c.Resources).Elem()
 	v := reflect.ValueOf(c.Resources).Elem()
 	for i := 0; i < t.NumField(); i++ {
@@ -69,15 +49,19 @@ func (c *Cgroup) Set(pid int) {
 		file := t.Field(i).Tag.Get("file")
 		subsystem := t.Field(i).Tag.Get("subsystem")
 
-		if subsystemPath, ok := c.Paths[subsystem]; ok {
-			fullPath := GetCgroupPath(subsystemPath, c.ScopePrefix, true)
-			log.Debugf("Setting cgroup: subsystem: %v file: %v val: %v", fullPath, file, val)
+		if subsystemPath, ok := c.Mounts[subsystem]; ok {
+			var fullPath string
+			// 从Paths中获取cgroup路径，如果没有，则调用GetCgroupPath函数获取，并保存至Paths中
+			if path, ok := c.Paths[subsystem]; ok {
+				fullPath = path
+			} else {
+				fullPath = GetCgroupPath(subsystemPath, c.ScopePrefix, true)
+				c.Paths[subsystem] = fullPath
+			}
+			log.Debugf("Setting cgroup: path: %v file: %v val: %v", fullPath, file, val)
 
 			if err := ioutil.WriteFile(path.Join(fullPath, file), []byte(val), 0644); err != nil {
 				log.Errorf("Error set cgroup: write %v fail: %v", fullPath, err)
-			}
-			if err := ioutil.WriteFile(path.Join(fullPath, "tasks"), []byte(strconv.Itoa(pid)), 0644); err != nil {
-				log.Errorf("Error set cgroup: write tasks fail: %v", err)
 			}
 		} else {
 			log.Errorf("Error set cgroup: can not found subsystem path: %v", subsystemPath)
@@ -85,38 +69,39 @@ func (c *Cgroup) Set(pid int) {
 	}
 }
 
+// Apply 将pid写入到cgroup的tasks中
+func (c *Cgroup) Apply(pid int) {
+	for _, fullpath := range c.Paths {
+		if err := ioutil.WriteFile(path.Join(fullpath, "tasks"), []byte(strconv.Itoa(pid)), 0644); err != nil {
+			log.Errorf("Error set cgroup: write tasks fail: %v", err)
+		}
+	}
+}
+
 // Remove 移除cgroup资源
 func (c *Cgroup) Remove() {
-	t := reflect.TypeOf(c.Resources).Elem()
-	v := reflect.ValueOf(c.Resources).Elem()
-	for i := 0; i < t.NumField(); i++ {
-		val := v.Field(i).Interface().(string)
-		if val == "" {
-			continue
-		}
-		subsystem := t.Field(i).Tag.Get("subsystem")
-
-		if subsystemPath, ok := c.Paths[subsystem]; ok {
-			fullPath := GetCgroupPath(subsystemPath, c.ScopePrefix, true)
-			log.Debugf("Removing cgroup: subsystem: %v", fullPath)
-			if err := os.RemoveAll(fullPath); err != nil {
-				log.Errorf("Remove cgroup failed: %v", err)
-			}
+	for _, fullpath := range c.Paths {
+		log.Debugf("Removing cgroup: path: %v", fullpath)
+		if err := os.RemoveAll(fullpath); err != nil {
+			log.Errorf("Remove cgroup failed: %v", err)
 		}
 	}
 }
 
 // Resources 包括cgroup资源
 type Resources struct {
-	// Memory limit (in bytes)
+	// 内存使用量限制
 	Memory string `file:"memory.limit_in_bytes" subsystem:"memory"`
 
-	// Whether to disable OOM Killer
+	// 设置/读取内存超限控制信息
 	OomKillDisable string `file:"memory.oom_control" subsystem:"memory"`
 
-	// CPU shares (relative weight vs. other containers)
+	// 控制各个cgroup组之间的配额占比
 	CpuShares string `file:"cpu.shares" subsystem:"cpu"`
 
-	// CPU to use
+	// 限制只能使用特定CPU节点
 	CpusetCpus string `file:"cpuset.cpus" subsystem:"cpuset"`
+
+	// 限制只能使用特定内存节点
+	CpusetMems string `file:"cpuset.mems" subsystem:"cpuset"`
 }

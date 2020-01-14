@@ -29,6 +29,10 @@ var runCommand = cli.Command{
 			Name:  "cpuset-cpus",
 			Usage: "CPUs in which to allow execution (0-3, 0,1)",
 		},
+		cli.StringFlag{
+			Name:  "cpuset-mems",
+			Usage: "Memory nodes (MEMs) in which to allow execution (0-3, 0,1). Only effective on NUMA systems.",
+		},
 	},
 	// 输入参数后执行的操作
 	Action: func(c *cli.Context) error {
@@ -39,8 +43,9 @@ var runCommand = cli.Command{
 		tty := c.Bool("it")
 		resource := &cgroups.Resources{
 			Memory:     c.String("memory"),
-			CpusetCpus: c.String("cpuset-cpus"),
 			CpuShares:   c.String("cpu-shares"),
+			CpusetCpus: c.String("cpuset-cpus"),
+			CpusetMems: c.String("cpuset-mems"),
 		}
 		// 运行Run函数
 		Run(tty, cmd, resource)
