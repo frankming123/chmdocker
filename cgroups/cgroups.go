@@ -39,14 +39,6 @@ func NewCgroup(scopePrefix string) *Cgroup {
 
 // Set 设置cgroup资源
 func (c *Cgroup) Set() {
-	// cpuset.cpus和cpuset.mems需同时配置才能生效，如果有一项缺少，配置相同即可
-	if c.CpusetCpus == "" && c.CpusetMems != "" {
-		c.CpusetCpus = c.CpusetMems
-	}
-	if c.CpusetCpus != "" && c.CpusetMems == "" {
-		c.CpusetMems = c.CpusetCpus
-	}
-
 	t := reflect.TypeOf(c.Resources).Elem()
 	v := reflect.ValueOf(c.Resources).Elem()
 	for i := 0; i < t.NumField(); i++ {
@@ -75,12 +67,17 @@ func (c *Cgroup) Set() {
 			log.Errorf("Error set cgroup: can not found subsystem path: %v", subsystemPath)
 		}
 	}
+
+	// 如果有cpuset子系统，则进行cpuset.cpus和cpuset.mems相关操作
+	if dir, ok := c.Paths["cpuset"]; ok {
+		copyCpuOrMemIfNeeded(dir)
+	}
 }
 
 // Apply 将pid写入到cgroup的tasks中
 func (c *Cgroup) Apply(pid int) {
-	for _, fullpath := range c.Paths {
-		if err := ioutil.WriteFile(path.Join(fullpath, "tasks"), []byte(strconv.Itoa(pid)), 0644); err != nil {
+	for _, dir := range c.Paths {
+		if err := ioutil.WriteFile(path.Join(dir, "tasks"), []byte(strconv.Itoa(pid)), 0644); err != nil {
 			log.Errorf("Error set cgroup: write tasks fail: %v", err)
 		}
 	}
@@ -88,9 +85,9 @@ func (c *Cgroup) Apply(pid int) {
 
 // Remove 移除cgroup资源
 func (c *Cgroup) Remove() {
-	for _, fullpath := range c.Paths {
-		log.Debugf("Removing cgroup: path: %v", fullpath)
-		if err := os.RemoveAll(fullpath); err != nil {
+	for _, dir := range c.Paths {
+		log.Debugf("Removing cgroup: path: %v", dir)
+		if err := os.RemoveAll(dir); err != nil {
 			log.Errorf("Remove cgroup failed: %v", err)
 		}
 	}
