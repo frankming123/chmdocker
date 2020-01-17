@@ -23,17 +23,24 @@ func readUserCommand() []string {
 func setUpMount() {
 	pwd, err := os.Getwd()
 	if err != nil {
-		log.Errorf("Get current location error %v", err)
+		log.Errorf("Get pwd error %v", err)
 		return
 	}
-	log.Infof("Current location is %s", pwd)
-	pivotRoot(pwd)
+	log.Infof("Pwd now is %s", pwd)
 
-	//mount proc
+	//mount proc and dev
 	defaultMountFlags := syscall.MS_NOEXEC | syscall.MS_NOSUID | syscall.MS_NODEV
-	syscall.Mount("proc", "/proc", "proc", uintptr(defaultMountFlags), "")
+	if err := syscall.Mount("proc", path.Join(pwd, "/proc"), "proc", uintptr(defaultMountFlags), ""); err != nil {
+		log.Errorf("mount /proc error: %v", err)
+	}
 
-	syscall.Mount("tmpfs", "/dev", "tmpfs", syscall.MS_NOSUID|syscall.MS_STRICTATIME, "mode=755")
+	if err := syscall.Mount("tmpfs", path.Join(pwd, "/dev"), "tmpfs", syscall.MS_NOSUID|syscall.MS_STRICTATIME, "mode=755"); err != nil {
+		log.Errorf("mount /proc error: %v", err)
+	}
+
+	if err := pivotRoot(pwd); err != nil {
+		log.Errorf("pivot root error: %v", err)
+	}
 }
 
 func pivotRoot(root string) error {

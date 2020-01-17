@@ -16,9 +16,24 @@ func NewParentProcess(tty bool) (*exec.Cmd, *os.File) {
 	}
 	// /proc/self/是一个链接，指向进程自身，/proc/PID/
 	cmd := exec.Command("/proc/self/exe", "init")
+
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS |
-			syscall.CLONE_NEWNET | syscall.CLONE_NEWIPC,
+			syscall.CLONE_NEWNET | syscall.CLONE_NEWIPC | syscall.CLONE_NEWUSER,
+		UidMappings: []syscall.SysProcIDMap{
+			{
+				ContainerID: 0, // 映射为root
+				HostID:      syscall.Getuid(),
+				Size:        1,
+			},
+		},
+		GidMappings: []syscall.SysProcIDMap{
+			{
+				ContainerID: 0, // 映射为root
+				HostID:      syscall.Getgid(),
+				Size:        1,
+			},
+		},
 	}
 	if tty {
 		cmd.Stdin = os.Stdin
@@ -31,6 +46,8 @@ func NewParentProcess(tty bool) (*exec.Cmd, *os.File) {
 
 	// 修改工作目录
 	cmd.Dir = "/tmp/alpine"
+
+	cmd.Env = []string{"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
 
 	return cmd, wpipe
 }
