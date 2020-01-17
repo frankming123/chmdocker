@@ -25,6 +25,12 @@ func NewParentProcess(tty bool) (*exec.Cmd, *os.File) {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 	}
+
+	// 传递管道
 	cmd.ExtraFiles = []*os.File{rpipe}
+
+	// 修改工作目录
+	cmd.Dir = "/tmp/alpine"
+
 	return cmd, wpipe
 }
