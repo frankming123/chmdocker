@@ -44,10 +44,16 @@ func NewParentProcess(tty bool) (*exec.Cmd, *os.File) {
 	// 传递管道
 	cmd.ExtraFiles = []*os.File{rpipe}
 
-	// 修改工作目录
-	cmd.Dir = "/tmp/alpine"
 
+	// 设置环境变量
 	cmd.Env = []string{"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
+
+	// 组合镜像
+	mntURL:="/var/chmdocker/mnt"
+	rootURL:="/var/chmdocker"
+	newWorkSpace(rootURL,mntURL)
+	// 修改工作目录
+	cmd.Dir=mntURL
 
 	return cmd, wpipe
 }
