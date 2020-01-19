@@ -5,7 +5,6 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path"
 	"strings"
 	"syscall"
@@ -30,8 +29,7 @@ func setUpMount() {
 	log.Infof("Pwd now is %s", pwd)
 
 	//mount proc and dev
-	defaultMountFlags := syscall.MS_NOEXEC | syscall.MS_NOSUID | syscall.MS_NODEV
-	if err := syscall.Mount("proc", path.Join(pwd, "/proc"), "proc", uintptr(defaultMountFlags), ""); err != nil {
+	if err := syscall.Mount("proc", path.Join(pwd, "/proc"), "proc", uintptr(syscall.MS_NOEXEC | syscall.MS_NOSUID | syscall.MS_NODEV), ""); err != nil {
 		log.Errorf("mount /proc error: %v", err)
 	}
 
@@ -74,84 +72,4 @@ func pivotRoot(root string) error {
 	}
 	// 删除临时文件夹
 	return os.Remove(pivotDir)
-}
-
-// 创建overlay2文件系统
-func newWorkSpace(rootURL string, mntURL string) {
-	createReadOnlyLayer(rootURL)
-	createWriteLayer(rootURL)
-	createMountPoint(rootURL, mntURL)
-}
-
-func createReadOnlyLayer(rootURL string) {
-	busyboxURL := path.Join(rootURL, "busybox")
-	busyboxTarURL := path.Join(rootURL, "alpine.tar")
-	exist, err := pathExists(busyboxURL)
-	if err != nil {
-		log.Infof("Fail to judge whether dir %s exists. %v", busyboxURL, err)
-	}
-	if exist == false {
-		if err := os.Mkdir(busyboxURL, 0777); err != nil {
-			log.Errorf("Mkdir dir %s error. %v", busyboxURL, err)
-		}
-		if _, err := exec.Command("tar", "-xvf", busyboxTarURL, "-C", busyboxURL).CombinedOutput(); err != nil {
-			log.Errorf("Untar dir %s error %v", busyboxURL, err)
-		}
-	}
-}
-
-func createWriteLayer(rootURL string) {
-	writeURL := rootURL + "writeLayer/"
-	if err := os.Mkdir(writeURL, 0777); err != nil {
-		log.Errorf("Mkdir dir %s error. %v", writeURL, err)
-	}
-}
-
-func createMountPoint(rootURL string, mntURL string) {
-	if err := os.Mkdir(mntURL, 0777); err != nil {
-		log.Errorf("Mkdir dir %s error. %v", mntURL, err)
-	}
-	dirs := "dirs=" + rootURL + "writeLayer:" + rootURL + "busybox"
-	cmd := exec.Command("mount", "-t", "aufs", "-o", dirs, "none", mntURL)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		log.Errorf("%v", err)
-	}
-}
-
-// 移除overlay2文件系统
-func deleteWorkSpace(rootURL string, mntURL string) {
-	deleteMountPoint(rootURL, mntURL)
-	deleteWriteLayer(rootURL)
-}
-
-func deleteMountPoint(rootURL string, mntURL string) {
-	cmd := exec.Command("umount", mntURL)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		log.Errorf("%v", err)
-	}
-	if err := os.RemoveAll(mntURL); err != nil {
-		log.Errorf("Remove dir %s error %v", mntURL, err)
-	}
-}
-
-func deleteWriteLayer(rootURL string) {
-	writeURL := rootURL + "writeLayer/"
-	if err := os.RemoveAll(writeURL); err != nil {
-		log.Errorf("Remove dir %s error %v", writeURL, err)
-	}
-}
-
-func pathExists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true, nil
-	}
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return false, err
 }

@@ -25,12 +25,12 @@ type Cgroup struct {
 }
 
 // NewCgroup 初始化Cgroup结构体
-func NewCgroup(scopePrefix string) *Cgroup {
+func NewCgroup(scopePrefix string,res *Resources) *Cgroup {
 	c := &Cgroup{
 		Mounts:      make(map[string]string),
 		Paths:       make(map[string]string),
 		ScopePrefix: scopePrefix,
-		Resources:   &Resources{},
+		Resources:   res,
 	}
 	// c.GetAllMountpoint()
 	c.Mounts = GetAllMountpoint()

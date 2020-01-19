@@ -22,8 +22,7 @@ func Run(tty bool, cmds []string, res *cgroups.Resources) {
 
 	//创建cgroup
 	scope := gensha256()
-	cgroup := cgroups.NewCgroup(scope)
-	cgroup.Resources = res
+	cgroup := cgroups.NewCgroup(scope, res)
 	cgroup.Set()
 	cgroup.Apply(parent.Process.Pid)
 
