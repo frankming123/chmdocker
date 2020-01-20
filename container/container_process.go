@@ -47,18 +47,5 @@ func NewParentProcess(tty bool) (*exec.Cmd, *os.File) {
 	// 设置环境变量
 	cmd.Env = []string{"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
 
-	// 组合镜像
-	lowerdir := "/var/lib/chmdocker/lower"
-	upperdir := "/var/lib/chmdocker/upper"
-	workdir := "/var/lib/chmdocker/work"
-	merged := "/var/lib/chmdocker/merged"
-	o := NewOverlay2([]string{lowerdir}, upperdir, workdir, merged)
-	if err := o.Set(); err != nil {
-		log.Fatalf("Mount overlay2 error: %v", err)
-	}
-	//newWorkSpace(rootURL,mntURL)
-	// 修改工作目录
-	cmd.Dir = merged
-
 	return cmd, wpipe
 }

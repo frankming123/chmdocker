@@ -29,8 +29,10 @@ func NewOverlay2(lowerdir []string, upperdir, workdir, merged string) *Overlay2 
 
 // Set 设置overlay2
 func (o *Overlay2) Set() error {
+	if err := o.ensureDirExists(); err != nil {
+		return err
+	}
 	data := fmt.Sprintf("lowerdir=%s,upperdir=%s,workdir=%s", strings.Join(o.lowerdir, ":"), o.upperdir, o.workdir)
-	println(data)
 	if err := syscall.Mount("overlay", o.merged, "overlay", syscall.MS_RELATIME, data); err != nil {
 		return fmt.Errorf("Mount overlay2 failed: %v", err)
 	}
@@ -45,8 +47,8 @@ func (o *Overlay2) Remove() error {
 	return nil
 }
 
-// EnsureDirExists 确保目录提前创建
-func (o *Overlay2) EnsureDirExists() error {
+// ensureDirExists 确保目录提前创建
+func (o *Overlay2) ensureDirExists() error {
 	args := []string{"-p", o.upperdir, o.workdir, o.merged}
 	args = append(args, o.lowerdir...)
 	cmd := exec.Command("mkdir", args...)
